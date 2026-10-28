@@ -1,0 +1,36 @@
+﻿CONSULTA CUIT BCRA - VERSIÓN PC  (v1.3)
+==========================
+
+Qué hace
+- Solapa "Informe por CUIT": nombre del titular, cheques rechazados (sí/no, montos, pagados o no),
+  situación en los bancos y historial de 24 meses. Fuente: BCRA Central de Deudores.
+- Solapa "Cheques denunciados": banco + Nº de cheque (+ sucursal y cuenta) y dice si está denunciado.
+- Banco: se escribe el nombre (Macro, Credicoop...) o el código (11, 285, 191) y se elige de la lista.
+- Tilde "Guardar" + Nota: deja el CUIT o el cheque en "Guardados" para buscarlo después por nombre,
+  número o nota y volver a consultarlo con doble clic. En CUIT también se puede escribir un nombre guardado.
+- Botones: Copiar informe, PDF (se guarda en HISTORIAL\PDF y se abre), Ver historial.
+- Usa la API oficial y gratuita del BCRA. No necesita clave ni captcha. Necesita internet.
+- El PDF lo arma Microsoft Edge (viene con Windows).
+
+INSTALAR EN OTRA PC
+1. Copiar esta carpeta completa a la otra PC (pendrive, Drive, etc.).
+2. Doble clic en "INSTALAR.bat".
+3. Aparece el ícono "Consulta CUIT BCRA" en el Escritorio. Después se puede borrar la carpeta copiada.
+
+El programa queda en:  %LOCALAPPDATA%\Programs\Consulta CUIT BCRA
+HISTORIAL (consultas, Guardados y PDF)
+- La primera vez que se abre en una PC pregunta dónde guardarlo:
+  · Si ya hay un historial en Google Drive (de otra PC): "¿Querés tomar ese historial?"
+      SÍ = usa ese (compartido entre las PCs)   NO = empieza uno nuevo solo en esa PC.
+  · Si no hay: "¿Querés guardar el historial en Google Drive?"
+- En Drive queda en: Mi unidad\001 - CLAUDE - CONSULTA CUIT BCRA\HISTORIAL
+- Lo que ya había en la PC se suma al de Drive (no se pierde nada).
+- Abajo de la ventana dice dónde se está guardando; "Cambiar" vuelve a preguntar.
+
+ACTUALIZAR: volver a copiar la carpeta nueva y hacer doble clic en INSTALAR.bat (no borra el historial).
+
+Archivos
+- ConsultaCUIT.ps1        el programa
+- cheque.ico              el ícono
+- Consulta CUIT BCRA.bat  abre el programa sin instalar
+- INSTALAR.bat / Instalar.ps1  instalador para otra PC
