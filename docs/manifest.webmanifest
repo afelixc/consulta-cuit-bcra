@@ -1,0 +1,16 @@
+{
+  "name": "Consulta CUIT BCRA",
+  "short_name": "Consulta CUIT",
+  "description": "Informe por CUIT y cheques denunciados (BCRA)",
+  "lang": "es-AR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ECF3FB",
+  "theme_color": "#1F4E8C",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
