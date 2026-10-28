@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Consulta CUIT BCRA</title>
+<meta name="description" content="Informe por CUIT y cheques denunciados (BCRA)">
+<meta name="theme-color" content="#1F4E8C">
+<meta name="color-scheme" content="light">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Consulta CUIT">
+<!-- Consulta CUIT BCRA - versión celular. v1.0 - 2026-10-28
+     Usa la API oficial y gratuita del BCRA (api.bcra.gob.ar), que permite consultas directas desde el navegador.
+     Los guardados y el historial quedan en el teléfono (localStorage). -->
+<style>
+  :root {
+    --azul: #1F4E8C; --azul-medio: #CDDEF3; --azul-claro: #ECF3FB;
+    --verde: #1E7A46; --verde-medio: #CBEAD5; --verde-claro: #EBF7EF;
+    --rojo: #B22222; --naranja: #C46A00; --ok: #1E7A46; --gris: #6B7280;
+    --texto: #1A1A1A; --borde: #D5DBE3; --blanco: #FFFFFF;
+    --color: var(--azul); --medio: var(--azul-medio); --claro: var(--azul-claro);
+  }
+  body.cheque { --color: var(--verde); --medio: var(--verde-medio); --claro: var(--verde-claro); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--claro); color: var(--texto); font-size: 16px;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    position: sticky; top: 0; z-index: 10; background: var(--color); color: #fff;
+    padding: calc(10px + env(safe-area-inset-top)) 16px 0;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+  }
+  .barra { display: flex; align-items: center; gap: 10px; }
+  .barra img { width: 30px; height: 30px; border-radius: 7px; }
+  .barra h1 { font-size: 18px; margin: 0; flex: 1; font-weight: 700; }
+  .btn-guardados { background: rgba(255,255,255,.18); color: #fff; border: 0; border-radius: 18px; padding: 7px 12px; font-size: 14px; font-weight: 600; }
+  .solapas { display: flex; margin-top: 10px; gap: 6px; }
+  .solapa {
+    flex: 1; border: 0; padding: 11px 6px; font-size: 15px; border-radius: 10px 10px 0 0; font-weight: 600; cursor: pointer;
+  }
+  .solapa.cuit { background: var(--azul-medio); color: var(--azul); }
+  .solapa.cheq { background: var(--verde-medio); color: var(--verde); }
+  .solapa.activa { background: var(--claro); }
+  body:not(.cheque) .solapa.cuit.activa { color: var(--azul); }
+  main { padding: 14px 16px 40px; max-width: 720px; margin: 0 auto; }
+  .tarjeta { background: var(--blanco); border-radius: 14px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 12px; }
+  label.campo { display: block; font-weight: 700; font-size: 14px; margin: 10px 0 4px; }
+  label.campo:first-child { margin-top: 0; }
+  label.campo span { font-weight: 400; color: var(--gris); }
+  input[type=text], input[type=search] {
+    width: 100%; font-size: 18px; padding: 11px 12px; border: 1.5px solid var(--borde); border-radius: 10px; background: #fff; color: var(--texto);
+  }
+  input:focus { outline: none; border-color: var(--color); box-shadow: 0 0 0 3px var(--medio); }
+  .fila { display: flex; gap: 10px; }
+  .fila > div { flex: 1; min-width: 0; }
+  .ayuda { font-size: 13px; color: var(--gris); margin-top: 8px; line-height: 1.35; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: 0; border-radius: 10px; padding: 12px 14px; font-size: 16px; font-weight: 600; cursor: pointer;
+  }
+  .btn.principal { background: var(--color); color: #fff; width: 100%; margin-top: 12px; font-size: 17px; padding: 14px; }
+  .btn.sec { background: var(--medio); color: var(--color); flex: 1; }
+  .btn:disabled { opacity: .5; }
+  .acciones { display: flex; gap: 8px; margin-top: 10px; }
+  .sugerencias { list-style: none; margin: 4px 0 0; padding: 0; border: 1.5px solid var(--borde); border-radius: 10px; background: #fff; max-height: 260px; overflow-y: auto; }
+  .sugerencias li { padding: 11px 12px; border-bottom: 1px solid #eef0f3; cursor: pointer; }
+  .sugerencias li:last-child { border-bottom: 0; }
+  .sugerencias li:active, .sugerencias li.sel { background: var(--claro); }
+  .banco-ok { color: var(--ok); font-weight: 700; font-size: 14px; margin-top: 6px; }
+  .banco-mal { color: var(--rojo); font-weight: 600; font-size: 14px; margin-top: 6px; }
+  .banco-varios { color: var(--naranja); font-weight: 600; font-size: 14px; margin-top: 6px; }
+
+  .resultado h2 { margin: 0 0 2px; font-size: 21px; color: var(--azul); }
+  .sub { color: var(--gris); font-size: 14px; }
+  .nota-guardada { color: #6B21A8; font-weight: 600; margin-top: 6px; }
+  .estado { border-radius: 12px; padding: 12px 14px; margin-top: 12px; font-weight: 800; font-size: 17px; }
+  .estado small { display: block; font-weight: 500; font-size: 14px; margin-top: 3px; }
+  .estado.bien { background: #E3F4E8; color: var(--ok); }
+  .estado.mal { background: #FBE6E6; color: var(--rojo); }
+  .estado.ojo { background: #FDF0DD; color: var(--naranja); }
+  .lista { margin-top: 10px; }
+  .item { border-top: 1px solid #eef0f3; padding: 9px 0; font-size: 14px; }
+  .item b { font-size: 15px; }
+  .item .der { float: right; font-weight: 700; }
+  .rojo { color: var(--rojo); } .naranja { color: var(--naranja); } .verde { color: var(--ok); } .grisc { color: var(--gris); }
+  .meses { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; margin-top: 8px; }
+  .mes { text-align: center; border-radius: 8px; padding: 5px 0; font-size: 12px; background: #E3F4E8; color: var(--ok); }
+  .mes b { display: block; font-size: 15px; }
+  .mes.s2 { background: #FDF0DD; color: var(--naranja); }
+  .mes.s3 { background: #FBE6E6; color: var(--rojo); }
+  .seccion { font-weight: 800; color: var(--azul); margin-top: 16px; font-size: 15px; }
+  .pie { color: var(--gris); font-size: 12px; margin-top: 14px; }
+  .guardar { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid #eef0f3; }
+  .guardar input[type=checkbox] { width: 24px; height: 24px; accent-color: var(--color); }
+  .guardar label { font-weight: 700; }
+  .cargando { text-align: center; color: var(--gris); padding: 20px; }
+  .error { color: var(--rojo); font-weight: 600; }
+
+  /* Ventana de guardados */
+  .hoja { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 50; display: none; }
+  .hoja.abierta { display: block; }
+  .hoja .panel {
+    position: absolute; left: 0; right: 0; bottom: 0; top: 8%; background: var(--claro); border-radius: 18px 18px 0 0;
+    display: flex; flex-direction: column; max-width: 720px; margin: 0 auto;
+  }
+  .hoja .cab { padding: 14px 16px 8px; display: flex; align-items: center; gap: 10px; }
+  .hoja .cab h3 { margin: 0; flex: 1; color: var(--color); }
+  .hoja .cerrar { background: var(--medio); color: var(--color); border: 0; border-radius: 18px; padding: 7px 14px; font-weight: 700; font-size: 15px; }
+  .hoja .busca { padding: 0 16px 8px; }
+  .hoja .subsolapas { display: flex; gap: 6px; padding: 0 16px 8px; }
+  .hoja .subsolapas button { flex: 1; border: 0; border-radius: 9px; padding: 9px; font-weight: 600; background: var(--medio); color: var(--color); font-size: 14px; }
+  .hoja .subsolapas button.activa { background: var(--color); color: #fff; }
+  .hoja .cuerpo { overflow-y: auto; padding: 0 16px 24px; flex: 1; }
+  .g { background: #fff; border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: center; }
+  .g .txt { flex: 1; min-width: 0; }
+  .g .t1 { font-weight: 700; }
+  .g .t2 { font-size: 13px; color: var(--gris); }
+  .g .nota { font-size: 13px; color: #6B21A8; }
+  .g.alerta .t1 { color: var(--rojo); }
+  .g .quitar { border: 0; background: #F3F4F6; border-radius: 8px; padding: 8px 10px; font-size: 13px; color: var(--gris); }
+  .vacio { color: var(--gris); text-align: center; padding: 30px 10px; }
+  .aviso { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #222; color: #fff; padding: 10px 16px; border-radius: 20px; font-size: 14px; z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  .aviso.ver { opacity: .92; }
+
+  @media print {
+    header, .no-imprimir, .hoja, .guardar, .acciones { display: none !important; }
+    body { background: #fff; }
+    main { padding: 0; }
+    .tarjeta { box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="barra">
+    <img src="icono-192.png" alt="">
+    <h1>Consulta CUIT BCRA</h1>
+    <button class="btn-guardados" id="btnGuardados">★ Guardados</button>
+  </div>
+  <div class="solapas">
+    <button class="solapa cuit activa" id="solCuit">Informe por CUIT</button>
+    <button class="solapa cheq" id="solCheq">Cheques denunciados</button>
+  </div>
+</header>
+
+<main>
+  <!-- Solapa CUIT -->
+  <section id="pagCuit">
+    <div class="tarjeta no-imprimir">
+      <label class="campo" for="cuit">CUIT / CUIL del titular</label>
+      <input type="text" id="cuit" inputmode="numeric" autocomplete="off" placeholder="Ej: 20-12345678-9">
+      <div class="ayuda">Con o sin guiones. También podés escribir un nombre o una nota de tus guardados.</div>
+      <button class="btn principal" id="btnCuit">Consultar</button>
+    </div>
+    <div id="resCuit"></div>
+  </section>
+
+  <!-- Solapa Cheques -->
+  <section id="pagCheq" hidden>
+    <div class="tarjeta no-imprimir">
+      <label class="campo" for="banco">Banco <span>(nombre o código)</span></label>
+      <input type="search" id="banco" autocomplete="off" placeholder="Ej: 11, 285, Macro, Credicoop">
+      <div id="bancoEstado"></div>
+      <ul class="sugerencias" id="bancoLista" hidden></ul>
+
+      <label class="campo" for="nroCheque">Nº de cheque</label>
+      <input type="text" id="nroCheque" inputmode="numeric" autocomplete="off" placeholder="Ej: 12345678">
+      <div class="fila">
+        <div>
+          <label class="campo" for="sucursal">Sucursal</label>
+          <input type="text" id="sucursal" inputmode="numeric" autocomplete="off" placeholder="Opcional">
+        </div>
+        <div>
+          <label class="campo" for="cuenta">Nº de cuenta</label>
+          <input type="text" id="cuenta" inputmode="numeric" autocomplete="off" placeholder="Recomendado">
+        </div>
+      </div>
+      <div class="ayuda">En la banda de números de abajo del cheque van, en orden: banco (3) · sucursal (3) · código postal (4) · Nº de cheque (8) · Nº de cuenta (11).</div>
+      <button class="btn principal" id="btnCheq">Consultar</button>
+    </div>
+    <div id="resCheq"></div>
+  </section>
+  <p class="pie no-imprimir" style="text-align:center">Datos: API oficial del BCRA ·
+    <a href="https://github.com/afelixc/consulta-cuit-bcra/releases/latest/download/Consulta-CUIT-BCRA-PC.zip">Descargar el programa para PC</a></p>
+</main>
+
+<!-- Ventana de guardados -->
+<div class="hoja" id="hoja">
+  <div class="panel">
+    <div class="cab"><h3 id="hojaTitulo">Guardados</h3><button class="cerrar" id="hojaCerrar">Cerrar</button></div>
+    <div class="subsolapas">
+      <button id="verGuardados" class="activa">★ Guardados</button>
+      <button id="verRecientes">Últimas consultas</button>
+    </div>
+    <div class="busca"><input type="search" id="hojaBuscar" placeholder="Buscar: nombre, CUIT, banco, número o nota"></div>
+    <div class="cuerpo" id="hojaLista"></div>
+  </div>
+</div>
+<div class="aviso" id="aviso"></div>
+
+<script>
+'use strict';
+const API = 'https://api.bcra.gob.ar';
+const SITUACIONES = { 0: 'Sin deuda', 1: 'Normal', 2: 'Riesgo bajo / seguimiento especial', 3: 'Riesgo medio / con problemas',
+  4: 'Riesgo alto / alto riesgo de insolvencia', 5: 'Irrecuperable', 6: 'Irrecuperable por disposición técnica' };
+const $ = id => document.getElementById(id);
+
+// ---------- Guardado en el teléfono ----------
+const almacen = {
+  leer(clave, defecto) { try { const v = localStorage.getItem(clave); return v ? JSON.parse(v) : defecto; } catch { return defecto; } },
+  escribir(clave, valor) { try { localStorage.setItem(clave, JSON.stringify(valor)); } catch {} }
+};
+let gCuit = almacen.leer('guardadosCuit', []);
+let gCheq = almacen.leer('guardadosCheq', []);
+let recientes = almacen.leer('recientes', []);
+const grabar = () => { almacen.escribir('guardadosCuit', gCuit); almacen.escribir('guardadosCheq', gCheq); almacen.escribir('recientes', recientes); };
+
+function agregarReciente(r) {
+  recientes = recientes.filter(x => x.clave !== r.clave);
+  recientes.unshift(r);
+  recientes = recientes.slice(0, 60);
+  grabar();
+}
+
+// ---------- Utilidades ----------
+const norm = t => String(t ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const coincide = (texto, buscado) => norm(buscado).split(/\s+/).filter(Boolean).every(p => norm(texto).includes(p));
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const plata = n => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(Number(n) || 0);
+const fecha = f => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f || ''); return m ? `${m[3]}/${m[2]}/${m[1]}` : (f || ''); };
+const periodo = p => { const m = /^(\d{4})(\d{2})$/.exec(p || ''); return m ? `${m[2]}/${m[1]}` : p; };
+const ahora = () => new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const fmtCuit = c => `${c.slice(0, 2)}-${c.slice(2, 10)}-${c.slice(10)}`;
+const tres = n => String(n).padStart(3, '0');
+
+function cuitValido(c) {
+  if (!/^\d{11}$/.test(c)) return false;
+  const m = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let s = 0; for (let i = 0; i < 10; i++) s += +c[i] * m[i];
+  let dv = 11 - (s % 11); if (dv === 11) dv = 0; if (dv === 10) dv = 9;
+  return dv === +c[10];
+}
+
+async function bcra(ruta) {
+  const r = await fetch(API + ruta);
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`El BCRA respondió con error ${r.status}`);
+  return (await r.json()).results;
+}
+
+function aviso(t) { const a = $('aviso'); a.textContent = t; a.classList.add('ver'); clearTimeout(aviso.t); aviso.t = setTimeout(() => a.classList.remove('ver'), 2200); }
+
+// ---------- Solapas ----------
+function irA(cual) {
+  const cheque = cual === 'cheque';
+  document.body.classList.toggle('cheque', cheque);
+  $('solCuit').classList.toggle('activa', !cheque);
+  $('solCheq').classList.toggle('activa', cheque);
+  $('pagCuit').hidden = cheque;
+  $('pagCheq').hidden = !cheque;
+  document.querySelector('meta[name=theme-color]').content = cheque ? '#1E7A46' : '#1F4E8C';
+  if (cheque) cargarBancos();
+}
+$('solCuit').onclick = () => irA('cuit');
+$('solCheq').onclick = () => irA('cheque');
+
+// ---------- Informe por CUIT ----------
+let ultCuit = null;   // último informe (para guardar / compartir)
+
+async function consultarCuit() {
+  const texto = $('cuit').value.trim();
+  let cuit = texto.replace(/\D/g, '');
+  if (/[a-záéíóúñ]/i.test(texto)) {
+    const m = gCuit.filter(g => coincide(`${g.cuit} ${g.nombre} ${g.nota}`, texto));
+    if (m.length === 1) cuit = m[0].cuit.replace(/\D/g, '');
+    else { abrirHoja('cuit', texto); return; }
+  }
+  const res = $('resCuit');
+  ultCuit = null;
+  if (!cuitValido(cuit)) { res.innerHTML = `<div class="tarjeta error">El CUIT no es válido (tienen que ser 11 números y el dígito verificador correcto).</div>`; return; }
+  $('cuit').value = fmtCuit(cuit);
+  $('cuit').blur();
+  res.innerHTML = `<div class="tarjeta cargando">Consultando ${fmtCuit(cuit)} en el BCRA…</div>`;
+  $('btnCuit').disabled = true;
+  let deudas, cheques, hist;
+  try {
+    [deudas, cheques, hist] = await Promise.all([
+      bcra(`/CentralDeDeudores/v1.0/Deudas/${cuit}`),
+      bcra(`/CentralDeDeudores/v1.0/Deudas/ChequesRechazados/${cuit}`),
+      bcra(`/CentralDeDeudores/v1.0/Deudas/Historicas/${cuit}`)
+    ]);
+  } catch (e) {
+    res.innerHTML = `<div class="tarjeta"><div class="error">No se pudo consultar al BCRA.</div><div class="sub">Revisá la conexión a internet o probá de nuevo en un rato.</div></div>`;
+    return;
+  } finally { $('btnCuit').disabled = false; }
+
+  const nombre = [deudas, cheques, hist].find(r => r && r.denominacion)?.denominacion || '';
+  const guardado = gCuit.find(g => g.cuit === fmtCuit(cuit));
+  await cargarBancos();
+
+  // Cheques rechazados
+  const lista = [];
+  for (const c of cheques?.causales || []) for (const e of c.entidades || []) for (const d of e.detalle || [])
+    lista.push({ causal: c.causal, banco: nombreBanco(e.entidad), nro: d.nroCheque, rechazo: d.fechaRechazo, monto: d.monto, pago: d.fechaPago });
+  lista.sort((a, b) => String(b.rechazo).localeCompare(String(a.rechazo)));
+  const impagos = lista.filter(c => !c.pago);
+  const total = lista.reduce((s, c) => s + (+c.monto || 0), 0);
+  const totalImp = impagos.reduce((s, c) => s + (+c.monto || 0), 0);
+
+  // Situación actual
+  const per = (deudas?.periodos || []).slice().sort((a, b) => b.periodo.localeCompare(a.periodo))[0];
+  const ents = (per?.entidades || []).slice().sort((a, b) => b.situacion - a.situacion);
+  const peor = ents.reduce((m, e) => Math.max(m, e.situacion), 0);
+  const deudaTotal = ents.reduce((s, e) => s + (+e.monto || 0), 0) * 1000;
+
+  // Historial 24 meses
+  const meses = (hist?.periodos || []).slice().sort((a, b) => b.periodo.localeCompare(a.periodo))
+    .map(p => ({ p: p.periodo, s: (p.entidades || []).reduce((m, e) => Math.max(m, e.situacion), 0) }));
+  const peorHist = meses.reduce((m, x) => Math.max(m, x.s), 0);
+  const clase = s => s <= 1 ? 'bien' : s === 2 ? 'ojo' : 'mal';
+
+  let h = `<div class="tarjeta resultado">
+    <div class="sub">CUIT ${fmtCuit(cuit)}</div>
+    <h2>${nombre ? esc(nombre) : '<span class="naranja">No figura en la Central de Deudores</span>'}</h2>
+    ${guardado?.nota ? `<div class="nota-guardada">Nota: ${esc(guardado.nota)}</div>` : ''}`;
+
+  if (!lista.length) h += `<div class="estado bien">✔ Cheques rechazados: NO TIENE</div>`;
+  else {
+    h += `<div class="estado mal">✖ Cheques rechazados: SÍ TIENE<small>${lista.length} cheques · ${plata(total)}${impagos.length ? ` · ${impagos.length} sin pagar (${plata(totalImp)})` : ' · todos pagados/levantados'}</small></div>
+      <div class="lista">${lista.map(c => `<div class="item ${c.pago ? '' : 'rojo'}"><span class="der">${plata(c.monto)}</span>
+        <b>Cheque ${esc(c.nro)}</b> · rechazado ${fecha(c.rechazo)}<br>${esc(c.causal)} · ${esc(c.banco)}<br>${c.pago ? `Pagado el ${fecha(c.pago)}` : '<b>SIN PAGAR</b>'}</div>`).join('')}</div>`;
+  }
+
+  if (per) {
+    h += `<div class="estado ${clase(peor)}">Situación en bancos: ${peor} - ${SITUACIONES[peor]}<small>Último informe ${periodo(per.periodo)} · deuda total ${plata(deudaTotal)}</small></div>
+      <div class="lista">${ents.map(e => {
+        const obs = [e.diasAtrasoPago > 0 ? `${e.diasAtrasoPago} días de atraso` : '', e.refinanciaciones ? 'refinanciada' : '',
+          e.procesoJud ? 'PROCESO JUDICIAL' : '', e.situacionJuridica ? 'situación jurídica' : '', e.enRevision ? 'en revisión' : ''].filter(Boolean).join(', ');
+        return `<div class="item ${e.situacion <= 1 ? '' : e.situacion === 2 ? 'naranja' : 'rojo'}"><span class="der">${plata(e.monto * 1000)}</span>
+          <b>${esc(e.entidad)}</b><br>Situación ${e.situacion}${obs ? ' · ' + esc(obs) : ''}</div>`;
+      }).join('')}</div>`;
+  } else h += `<div class="estado bien">✔ Situación en bancos: no registra deudas</div>`;
+
+  if (meses.length) {
+    h += `<div class="seccion">Historial últimos 24 meses</div>
+      <div class="meses">${meses.map(m => `<div class="mes ${m.s >= 3 ? 's3' : m.s === 2 ? 's2' : ''}">${periodo(m.p).replace('/20', '/')}<b>${m.s}</b></div>`).join('')}</div>
+      <div class="sub ${peorHist <= 1 ? 'verde' : peorHist === 2 ? 'naranja' : 'rojo'}" style="margin-top:6px;font-weight:700">Peor situación en 24 meses: ${peorHist} - ${SITUACIONES[peorHist]}</div>`;
+  }
+
+  h += `<div class="pie">Situaciones: 1 Normal · 2 Riesgo bajo · 3 Riesgo medio · 4 Riesgo alto · 5 Irrecuperable · 6 Irrec. disp. técnica<br>
+    Fuente: BCRA Central de Deudores · consultado el ${ahora()}</div>
+    <div class="guardar"><input type="checkbox" id="chkCuit" ${guardado ? 'checked' : ''}><label for="chkCuit">Guardar este CUIT</label></div>
+    <input type="text" id="notaCuit" placeholder="Nota: ej. cheque 4512 de Pérez, vence 15/11" value="${esc(guardado?.nota || '')}" style="margin-top:8px;font-size:16px">
+    <div class="acciones"><button class="btn sec" id="compCuit">Compartir</button><button class="btn sec" id="pdfCuit">PDF</button><button class="btn sec" id="copCuit">Copiar</button></div>
+  </div>`;
+  res.innerHTML = h;
+
+  const txtCheques = lista.length ? `SÍ: ${lista.length} (${impagos.length} sin pagar)` : 'NO';
+  ultCuit = { cuit: fmtCuit(cuit), nombre, cheques: txtCheques, situacion: `${peor} - ${SITUACIONES[peor]}`, fecha: ahora(), alerta: lista.length > 0 || peor >= 3 };
+  ultCuit.texto = [`INFORME POR CUIT - BCRA`, `CUIT ${fmtCuit(cuit)}`, nombre || 'No figura en la Central de Deudores',
+    `Cheques rechazados: ${lista.length ? `SÍ - ${lista.length} cheques (${plata(total)}), ${impagos.length} sin pagar` : 'NO TIENE'}`,
+    ...lista.map(c => `  · Cheque ${c.nro} ${fecha(c.rechazo)} ${plata(c.monto)} ${c.pago ? 'pagado ' + fecha(c.pago) : 'SIN PAGAR'} (${c.causal}, ${c.banco})`),
+    `Situación en bancos: ${per ? `${peor} - ${SITUACIONES[peor]} (informe ${periodo(per.periodo)}, deuda ${plata(deudaTotal)})` : 'sin deudas'}`,
+    meses.length ? `Peor situación en 24 meses: ${peorHist} - ${SITUACIONES[peorHist]}` : '',
+    `Fuente: BCRA Central de Deudores - ${ahora()}`].filter(Boolean).join('\n');
+
+  if (guardado) { Object.assign(guardado, { nombre, cheques: txtCheques, situacion: ultCuit.situacion, ultima: ultCuit.fecha, alerta: ultCuit.alerta }); }
+  agregarReciente({ tipo: 'cuit', clave: ultCuit.cuit, t1: `${ultCuit.cuit} ${nombre}`, t2: `Cheques rechazados: ${txtCheques} · Sit. ${ultCuit.situacion}`, fecha: ultCuit.fecha, alerta: ultCuit.alerta, datos: { cuit: ultCuit.cuit } });
+
+  $('chkCuit').onchange = () => guardarCuit();
+  $('notaCuit').onchange = () => { if ($('chkCuit').checked) guardarCuit(); };
+  $('compCuit').onclick = () => compartir(ultCuit.texto, `Informe ${ultCuit.cuit}`);
+  $('copCuit').onclick = () => copiar(ultCuit.texto);
+  $('pdfCuit').onclick = () => imprimir(`Informe CUIT ${ultCuit.cuit} ${nombre}`);
+}
+
+function guardarCuit() {
+  if (!ultCuit) return;
+  const nota = $('notaCuit').value.trim();
+  const i = gCuit.findIndex(g => g.cuit === ultCuit.cuit);
+  if ($('chkCuit').checked) {
+    const d = { cuit: ultCuit.cuit, nombre: ultCuit.nombre, nota, cheques: ultCuit.cheques, situacion: ultCuit.situacion, ultima: ultCuit.fecha, alerta: ultCuit.alerta, guardado: i >= 0 ? gCuit[i].guardado : ahora() };
+    if (i >= 0) gCuit[i] = d; else gCuit.unshift(d);
+    aviso('Guardado ★');
+  } else if (i >= 0) { gCuit.splice(i, 1); aviso('Quitado de guardados'); }
+  grabar();
+}
+
+$('btnCuit').onclick = consultarCuit;
+$('cuit').addEventListener('keydown', e => { if (e.key === 'Enter') consultarCuit(); });
+
+// ---------- Bancos ----------
+let bancos = almacen.leer('bancos', null);
+let bancoSel = null;
+async function cargarBancos() {
+  if (bancos && bancos.length) return;
+  try {
+    const r = await bcra('/cheques/v1.0/entidades');
+    bancos = (r || []).map(b => ({ codigo: +b.codigoEntidad, nombre: b.denominacion })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+    almacen.escribir('bancos', bancos);
+  } catch { bancos = null; }
+}
+const nombreBanco = cod => bancos?.find(b => b.codigo === +cod)?.nombre || `Entidad ${cod}`;
+const textoBanco = b => `${b.nombre} (${tres(b.codigo)})`;
+
+function buscarBancos(t) {
+  t = t.trim();
+  if (!t || !bancos) return [];
+  if (/^\d+$/.test(t)) {
+    const n = +t;
+    return [...bancos.filter(b => b.codigo === n), ...bancos.filter(b => b.codigo !== n && String(b.codigo).startsWith(String(n)))];
+  }
+  return bancos.filter(b => coincide(b.nombre, t));
+}
+
+function elegirBanco(b) {
+  bancoSel = b;
+  $('banco').value = b.nombre;
+  $('bancoLista').hidden = true;
+  $('bancoEstado').innerHTML = `<div class="banco-ok">✔ ${esc(textoBanco(b))}</div>`;
+}
+
+$('banco').addEventListener('input', async () => {
+  await cargarBancos();
+  bancoSel = null;
+  const t = $('banco').value.trim();
+  const m = buscarBancos(t);
+  const lista = $('bancoLista'), est = $('bancoEstado');
+  lista.hidden = true; lista.innerHTML = '';
+  if (!t) { est.innerHTML = ''; return; }
+  if (!m.length) { est.innerHTML = `<div class="banco-mal">${bancos ? '✖ No encontré ese banco' : 'No se pudo cargar la lista de bancos (¿hay internet?)'}</div>`; return; }
+  if ((/^\d+$/.test(t) && m[0].codigo === +t) || m.length === 1) {
+    bancoSel = m[0];
+    est.innerHTML = `<div class="banco-ok">✔ ${esc(textoBanco(m[0]))}</div>`;
+  } else est.innerHTML = `<div class="banco-varios">Hay ${m.length} bancos: tocá el tuyo</div>`;
+  if (m.length > 1) {
+    lista.innerHTML = m.slice(0, 15).map((b, i) => `<li data-i="${i}">${esc(textoBanco(b))}</li>`).join('');
+    lista.hidden = false;
+    lista.querySelectorAll('li').forEach(li => li.onclick = () => { elegirBanco(m[+li.dataset.i]); $('nroCheque').focus(); });
+  }
+});
+
+// ---------- Cheques denunciados ----------
+let ultCheq = null;
+const mismaCuenta = (a, b) => {
+  a = String(a ?? '').replace(/\D/g, '').replace(/^0+/, ''); b = String(b ?? '').replace(/\D/g, '').replace(/^0+/, '');
+  if (!a || !b) return false;
+  return a === b || (a.length >= 5 && b.endsWith(a)) || (b.length >= 5 && a.endsWith(b));
+};
+const claveCheq = g => `${g.codigo}|${g.nro}|${g.suc}|${g.cta}`;
+
+async function consultarCheque() {
+  const res = $('resCheq');
+  ultCheq = null;
+  $('bancoLista').hidden = true;
+  const nro = $('nroCheque').value.replace(/\D/g, ''), suc = $('sucursal').value.replace(/\D/g, ''), cta = $('cuenta').value.replace(/\D/g, '');
+  if (!bancoSel) {
+    res.innerHTML = `<div class="tarjeta error">${$('banco').value.trim() ? 'Tocá tu banco en la lista que aparece debajo del casillero.' : 'Falta el banco: escribí el nombre o el código (Nación 11, Macro 285, Credicoop 191…).'}</div>`;
+    $('banco').focus(); return;
+  }
+  if (!nro) { res.innerHTML = `<div class="tarjeta error">Falta el número de cheque.</div>`; $('nroCheque').focus(); return; }
+  document.activeElement?.blur();
+  res.innerHTML = `<div class="tarjeta cargando">Consultando en el BCRA…</div>`;
+  $('btnCheq').disabled = true;
+  let r;
+  try { r = await bcra(`/cheques/v1.0/denunciados/${bancoSel.codigo}/${nro}`); }
+  catch { res.innerHTML = `<div class="tarjeta"><div class="error">No se pudo consultar al BCRA.</div><div class="sub">Revisá la conexión a internet o probá de nuevo en un rato.</div></div>`; return; }
+  finally { $('btnCheq').disabled = false; }
+
+  const banco = r?.denominacionEntidad || bancoSel.nombre;
+  const datos = { codigo: bancoSel.codigo, banco, nro, suc, cta };
+  const guardado = gCheq.find(g => claveCheq(g) === claveCheq(datos));
+  let det = r?.detalles || [];
+  const todos = det.length;
+  if (suc) det = det.filter(d => +d.sucursal === +suc);
+  if (cta) det = det.filter(d => mismaCuenta(d.numeroCuenta, cta));
+
+  let estado, resultado;
+  if (!r) { estado = `<div class="estado ojo">El BCRA no reconoce ese banco</div>`; resultado = 'Banco no reconocido'; }
+  else if (!r.denunciado || !todos) { estado = `<div class="estado bien">✔ NO FIGURA DENUNCIADO<small>Ningún cheque con ese número está denunciado en ese banco.</small></div>`; resultado = 'No figura denunciado'; }
+  else if (cta && det.length) { estado = `<div class="estado mal">⚠ ¡ATENCIÓN! ESTE CHEQUE ESTÁ DENUNCIADO</div>`; resultado = 'DENUNCIADO'; }
+  else if (cta) { estado = `<div class="estado bien">✔ NO FIGURA DENUNCIADO PARA ESA CUENTA<small class="naranja">Hay ${todos} cheque(s) con ese número denunciados en el banco, pero de otras cuentas. Verificá que el Nº de cuenta esté bien copiado.</small></div>`; resultado = 'No figura para esa cuenta'; }
+  else if (suc && !det.length) { estado = `<div class="estado bien">✔ NO FIGURA DENUNCIADO PARA ESA SUCURSAL<small class="naranja">Hay ${todos} cheque(s) con ese número denunciados en otras sucursales.</small></div>`; resultado = 'No figura para esa sucursal'; }
+  else { estado = `<div class="estado ojo">Hay ${det.length} cheque(s) con ese número denunciados en ese banco<small>El mismo número existe en muchas cuentas. Cargá el Nº de cuenta (y sucursal) para saber si es el tuyo.</small></div>`; resultado = `Posible: ${det.length} con ese número`; }
+
+  const alerta = resultado === 'DENUNCIADO';
+  res.innerHTML = `<div class="tarjeta resultado">
+    <div class="sub">Consulta de cheque denunciado</div>
+    <h2 style="color:var(--verde)">${esc(banco)} (${tres(bancoSel.codigo)})</h2>
+    <div class="sub" style="color:var(--texto);font-weight:600">Cheque Nº ${esc(nro)}${suc ? ` · Sucursal ${esc(suc)}` : ''}${cta ? ` · Cuenta ${esc(cta)}` : ''}</div>
+    ${guardado?.nota ? `<div class="nota-guardada">Nota: ${esc(guardado.nota)}</div>` : ''}
+    ${estado}
+    ${det.length ? `<div class="lista">${det.slice(0, 300).map(d => `<div class="item ${cta || suc ? 'rojo' : ''}"><b>Sucursal ${d.sucursal}</b> · Cuenta ${d.numeroCuenta}<br>${esc(d.causal)}</div>`).join('')}</div>` : ''}
+    <div class="pie">${r ? `Datos del BCRA al ${fecha(r.fechaProcesamiento)} · ` : ''}consultado el ${ahora()}</div>
+    <div class="guardar"><input type="checkbox" id="chkCheq" ${guardado ? 'checked' : ''}><label for="chkCheq">Guardar este cheque</label></div>
+    <input type="text" id="notaCheq" placeholder="Nota: ej. me lo dio Pérez por la factura 0001-234" value="${esc(guardado?.nota || '')}" style="margin-top:8px;font-size:16px">
+    <div class="acciones"><button class="btn sec" id="compCheq">Compartir</button><button class="btn sec" id="pdfCheq">PDF</button><button class="btn sec" id="copCheq">Copiar</button></div>
+  </div>`;
+
+  ultCheq = { ...datos, resultado, fecha: ahora(), alerta };
+  ultCheq.texto = [`CHEQUE DENUNCIADO - BCRA`, `Banco: ${banco} (${tres(bancoSel.codigo)})`,
+    `Cheque Nº ${nro}${suc ? ' · Sucursal ' + suc : ''}${cta ? ' · Cuenta ' + cta : ''}`, `Resultado: ${resultado}`,
+    `Fuente: BCRA Cheques denunciados - ${ahora()}`].join('\n');
+  if (guardado) Object.assign(guardado, { resultado, ultima: ultCheq.fecha, alerta });
+  agregarReciente({ tipo: 'cheque', clave: 'ch|' + claveCheq(datos), t1: `Cheque ${nro} · ${banco}`, t2: `${resultado}${cta ? ' · cuenta ' + cta : ''}`, fecha: ultCheq.fecha, alerta, datos });
+
+  $('chkCheq').onchange = () => guardarCheque();
+  $('notaCheq').onchange = () => { if ($('chkCheq').checked) guardarCheque(); };
+  $('compCheq').onclick = () => compartir(ultCheq.texto, `Cheque ${nro}`);
+  $('copCheq').onclick = () => copiar(ultCheq.texto);
+  $('pdfCheq').onclick = () => imprimir(`Cheque denunciado ${nro} ${banco}`);
+}
+
+function guardarCheque() {
+  if (!ultCheq) return;
+  const nota = $('notaCheq').value.trim();
+  const i = gCheq.findIndex(g => claveCheq(g) === claveCheq(ultCheq));
+  if ($('chkCheq').checked) {
+    const d = { codigo: ultCheq.codigo, banco: ultCheq.banco, nro: ultCheq.nro, suc: ultCheq.suc, cta: ultCheq.cta, nota, resultado: ultCheq.resultado, ultima: ultCheq.fecha, alerta: ultCheq.alerta, guardado: i >= 0 ? gCheq[i].guardado : ahora() };
+    if (i >= 0) gCheq[i] = d; else gCheq.unshift(d);
+    aviso('Guardado ★');
+  } else if (i >= 0) { gCheq.splice(i, 1); aviso('Quitado de guardados'); }
+  grabar();
+}
+
+$('btnCheq').onclick = consultarCheque;
+['nroCheque', 'sucursal', 'cuenta'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') consultarCheque(); }));
+['nroCheque', 'sucursal', 'cuenta'].forEach(id => $(id).addEventListener('focus', () => { $('bancoLista').hidden = true; }));
+
+// ---------- Compartir / copiar / PDF ----------
+async function compartir(texto, titulo) {
+  if (navigator.share) { try { await navigator.share({ title: titulo, text: texto }); } catch {} }
+  else copiar(texto);
+}
+async function copiar(texto) {
+  try { await navigator.clipboard.writeText(texto); aviso('Copiado'); }
+  catch { aviso('No se pudo copiar'); }
+}
+function imprimir(titulo) {
+  const anterior = document.title;
+  document.title = titulo;          // nombre sugerido del PDF
+  window.print();
+  setTimeout(() => { document.title = anterior; }, 500);
+}
+
+// ---------- Ventana de guardados ----------
+let hojaVista = 'guardados', hojaTipo = 'cuit';
+function abrirHoja(tipo, filtro = '') {
+  hojaTipo = tipo; hojaVista = 'guardados';
+  $('hojaBuscar').value = filtro;
+  $('hoja').classList.add('abierta');
+  pintarHoja();
+}
+function pintarHoja() {
+  const cheque = hojaTipo === 'cheque';
+  $('hojaTitulo').textContent = cheque ? 'Cheques' : 'CUIT';
+  $('verGuardados').classList.toggle('activa', hojaVista === 'guardados');
+  $('verRecientes').classList.toggle('activa', hojaVista === 'recientes');
+  const f = $('hojaBuscar').value.trim();
+  let html = '';
+  if (hojaVista === 'guardados') {
+    const datos = cheque ? gCheq : gCuit;
+    const vis = datos.map((g, i) => ({ g, i })).filter(({ g }) => !f || coincide(cheque ? `${g.banco} ${tres(g.codigo)} ${g.nro} ${g.suc} ${g.cta} ${g.nota} ${g.resultado}` : `${g.cuit} ${g.nombre} ${g.nota}`, f));
+    html = vis.map(({ g, i }) => cheque
+      ? `<div class="g ${g.alerta ? 'alerta' : ''}" data-i="${i}"><div class="txt"><div class="t1">Cheque ${esc(g.nro)} · ${esc(g.banco)}</div>
+          <div class="t2">${g.suc ? 'Suc. ' + esc(g.suc) + ' · ' : ''}${g.cta ? 'Cuenta ' + esc(g.cta) + ' · ' : ''}${esc(g.resultado)} · ${esc(g.ultima)}</div>${g.nota ? `<div class="nota">${esc(g.nota)}</div>` : ''}</div>
+          <button class="quitar" data-q="${i}">Quitar</button></div>`
+      : `<div class="g ${g.alerta ? 'alerta' : ''}" data-i="${i}"><div class="txt"><div class="t1">${esc(g.nombre || 'Sin nombre')}</div>
+          <div class="t2">${esc(g.cuit)} · Cheques rech.: ${esc(g.cheques)} · Sit. ${esc(g.situacion)}</div>${g.nota ? `<div class="nota">${esc(g.nota)}</div>` : ''}</div>
+          <button class="quitar" data-q="${i}">Quitar</button></div>`).join('');
+    if (!vis.length) html = `<div class="vacio">${datos.length ? 'Nada coincide con la búsqueda.' : 'Todavía no guardaste nada.<br>Consultá y tocá “Guardar”.'}</div>`;
+  } else {
+    const vis = recientes.map((r, i) => ({ r, i })).filter(({ r }) => r.tipo === (cheque ? 'cheque' : 'cuit') && (!f || coincide(`${r.t1} ${r.t2}`, f)));
+    html = vis.map(({ r, i }) => `<div class="g ${r.alerta ? 'alerta' : ''}" data-r="${i}"><div class="txt"><div class="t1">${esc(r.t1)}</div><div class="t2">${esc(r.t2)}</div><div class="t2">${esc(r.fecha)}</div></div></div>`).join('')
+      || `<div class="vacio">Sin consultas todavía.</div>`;
+  }
+  const cuerpo = $('hojaLista');
+  cuerpo.innerHTML = html;
+  cuerpo.querySelectorAll('[data-q]').forEach(b => b.onclick = ev => {
+    ev.stopPropagation();
+    const lista = cheque ? gCheq : gCuit;
+    const g = lista[+b.dataset.q];
+    if (!confirm(`¿Quitar ${cheque ? 'el cheque ' + g.nro : g.nombre || g.cuit} de los guardados?`)) return;
+    lista.splice(+b.dataset.q, 1); grabar(); pintarHoja();
+  });
+  cuerpo.querySelectorAll('[data-i]').forEach(d => d.onclick = () => abrirGuardado((cheque ? gCheq : gCuit)[+d.dataset.i], cheque));
+  cuerpo.querySelectorAll('[data-r]').forEach(d => d.onclick = () => {
+    const r = recientes[+d.dataset.r];
+    abrirGuardado(r.tipo === 'cheque' ? { codigo: r.datos.codigo, banco: r.datos.banco, nro: r.datos.nro, suc: r.datos.suc, cta: r.datos.cta } : { cuit: r.datos.cuit }, r.tipo === 'cheque');
+  });
+}
+async function abrirGuardado(g, cheque) {
+  $('hoja').classList.remove('abierta');
+  if (cheque) {
+    irA('cheque');
+    await cargarBancos();
+    elegirBanco(bancos?.find(b => b.codigo === +g.codigo) || { codigo: +g.codigo, nombre: g.banco });
+    $('nroCheque').value = g.nro; $('sucursal').value = g.suc || ''; $('cuenta').value = g.cta || '';
+    consultarCheque();
+  } else {
+    irA('cuit');
+    $('cuit').value = g.cuit;
+    consultarCuit();
+  }
+}
+$('btnGuardados').onclick = () => abrirHoja(document.body.classList.contains('cheque') ? 'cheque' : 'cuit');
+$('hojaCerrar').onclick = () => $('hoja').classList.remove('abierta');
+$('hoja').onclick = e => { if (e.target === $('hoja')) $('hoja').classList.remove('abierta'); };
+$('verGuardados').onclick = () => { hojaVista = 'guardados'; pintarHoja(); };
+$('verRecientes').onclick = () => { hojaVista = 'recientes'; pintarHoja(); };
+$('hojaBuscar').oninput = pintarHoja;
+
+// Que funcione como app instalada (abre sin internet; las consultas sí necesitan internet)
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
