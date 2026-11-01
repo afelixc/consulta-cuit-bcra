@@ -1,0 +1,20 @@
+﻿CONSULTA CUIT BCRA - VERSIÓN CELULAR  (v1.0)
+============================================
+
+Es una "app web": una página hecha para el teléfono que se instala como ícono en la pantalla de inicio.
+Funciona en Android y en iPhone. No necesita servidor: consulta directo a la API oficial del BCRA.
+
+Archivos (todos juntos en una misma carpeta web)
+- index.html             la app completa
+- manifest.webmanifest   nombre, colores e ícono para "instalarla"
+- sw.js                  hace que abra rápido y sin señal (las consultas igual necesitan internet)
+- icono-192.png / icono-512.png / apple-touch-icon.png   íconos
+
+Para ponerla en el teléfono hay que publicar esta carpeta en internet (GitHub Pages o Netlify, gratis).
+Después, en el teléfono:
+- Android (Chrome): abrir la dirección > menú ⋮ > "Agregar a la pantalla de inicio" / "Instalar app".
+- iPhone (Safari): abrir la dirección > botón Compartir > "Agregar a inicio".
+
+Guardados y "Últimas consultas" quedan en el teléfono (no se comparten con la PC por ahora).
+
+ACTUALIZAR: cambiar los archivos publicados y subir la VERSION en sw.js (consulta-cuit-v1 -> v2).
